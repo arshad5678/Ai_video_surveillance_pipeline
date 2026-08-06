@@ -69,6 +69,21 @@ loitering:
   verbose: false
   stale_state_ttl_seconds: 300 # prune (track,zone) dwell state unseen for this long (cleanup, not an event)
 
+events:
+  enabled: true
+  enabled_event_types:          # empty list = no restriction (all types allowed)
+    - intrusion_enter
+    - intrusion_exit
+    - loitering
+  minimum_severity: LOW          # LOW | MEDIUM | HIGH
+  zone_filter: []                # empty = all zones allowed; list of zone_id to restrict
+  track_filter: []                # empty = all tracks allowed (optional); list of track_id to restrict
+  severity_mapping:
+    intrusion_enter: HIGH
+    intrusion_exit: LOW
+    loitering: MEDIUM
+  verbose: false
+
 logging:
   level: "INFO"
   rotation: "10 MB"
