@@ -41,6 +41,18 @@ detection:
   image_size: 640
   verbose: false
 
+tracking:
+  tracker_type: "bytetrack"
+  track_high_thresh: 0.5     # detections above this are matched in stage 1 (against all active tracks)
+  track_low_thresh: 0.1      # detections below this are discarded entirely
+  new_track_thresh: 0.6      # unmatched high-conf detections spawn a new track only above this
+  track_buffer: 30           # frames a track may go unmatched before removal (scaled by frame_rate)
+  match_thresh: 0.8          # minimum IoU for a stage-1 match
+  frame_rate: 30             # source video fps — scales track_buffer to real time
+  minimum_box_area: 10       # detections with bbox area below this are ignored
+  history_length: 30         # max trajectory points retained per track
+  verbose: false
+
 logging:
   level: "INFO"
   rotation: "10 MB"
