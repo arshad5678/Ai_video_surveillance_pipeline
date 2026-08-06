@@ -265,6 +265,17 @@ def test_no_logs_when_disabled(tmp_path: Path) -> None:
 # --- getters / misc -----------------------------------------------------
 
 
+def test_latest_snapshot_falls_back_to_disk_for_a_fresh_instance(tmp_path: Path) -> None:
+    # Simulates a separate reader process (e.g. the Prompt 12 API) that never
+    # called write_frame() itself, but the snapshot files already exist on disk.
+    writer = OutputGenerator(make_config(tmp_path / "out"))
+    writer.write_frame(make_processed_frame(), [make_track()], [make_zone()], [make_event(event_id="evt-1")])
+
+    reader = OutputGenerator(make_config(tmp_path / "out"))
+
+    assert reader.latest_snapshot() == writer.latest_snapshot() == tmp_path / "out" / "snapshots" / "event_001.jpg"
+
+
 def test_latest_video_is_none_when_annotated_video_disabled(tmp_path: Path) -> None:
     generator = OutputGenerator(make_config(tmp_path / "out", annotated_video=False))
 

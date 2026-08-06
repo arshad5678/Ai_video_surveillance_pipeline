@@ -3,6 +3,7 @@ tests require no real webcam, file, or network stream."""
 
 from unittest.mock import MagicMock, patch
 
+import cv2
 import numpy as np
 import pytest
 
@@ -144,3 +145,34 @@ def test_close_releases_capture_and_resets_state(mock_capture_cls: MagicMock) ->
 
     mock_capture.release.assert_called_once()
     assert not video_input.is_open
+
+
+@patch("src.surveillance.pipelines.video_input.video_input.cv2.VideoCapture")
+def test_probe_status_reports_connected_with_fps_and_resolution(mock_capture_cls: MagicMock) -> None:
+    mock_capture = MagicMock()
+    mock_capture.isOpened.return_value = True
+    mock_capture.get.side_effect = lambda prop: {
+        cv2.CAP_PROP_FPS: 25.0,
+        cv2.CAP_PROP_FRAME_WIDTH: 1280,
+        cv2.CAP_PROP_FRAME_HEIGHT: 720,
+    }[prop]
+    mock_capture_cls.return_value = mock_capture
+
+    config = VideoSourceConfig(source_type=VideoSourceType.WEBCAM, uri=0)
+    status = VideoInput(config).probe_status()
+
+    assert status.connected is True
+    assert status.fps == 25.0
+    assert status.width == 1280
+    assert status.height == 720
+    mock_capture.release.assert_called_once()  # probe always closes again
+
+
+def test_probe_status_reports_disconnected_without_raising() -> None:
+    config = VideoSourceConfig(source_type=VideoSourceType.FILE, uri="does/not/exist.mp4")
+    status = VideoInput(config).probe_status()
+
+    assert status.connected is False
+    assert status.fps is None
+    assert status.width is None
+    assert status.height is None

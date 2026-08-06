@@ -166,8 +166,19 @@ class OutputGenerator:
         return self._video_path
 
     def latest_snapshot(self) -> Optional[Path]:
-        """Path to the most recently saved event snapshot, or None if no event has fired yet."""
-        return self._latest_snapshot_path
+        """Path to the most recently saved event snapshot, or None if none exists yet.
+
+        Falls back to scanning the snapshots directory (sequentially
+        numbered event_NNN.jpg, so a lexicographic sort is also the
+        chronological order) when this instance hasn't itself saved one
+        -- e.g. a fresh API process reading snapshots a separate pipeline
+        run already wrote to disk, per "consume outputs already generated
+        by previous modules."
+        """
+        if self._latest_snapshot_path is not None:
+            return self._latest_snapshot_path
+        candidates = sorted(self._snapshots_dir.glob("event_*.jpg"))
+        return candidates[-1] if candidates else None
 
     def latest_event_log(self) -> EventLogPaths:
         """Paths to the JSON/CSV event logs (None for whichever format is disabled)."""

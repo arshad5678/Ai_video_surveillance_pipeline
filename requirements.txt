@@ -38,3 +38,4 @@ psycopg2-binary>=2.9,<3.0       # PostgreSQL driver for production deployments
 # --- Misc utilities ------------------------------------------------------
 tqdm>=4.66,<5.0                 # progress bars for batch/video processing
 orjson>=3.10,<4.0                # fast JSON responses
+psutil>=5.9,<6.0                 # process CPU/memory usage for the System router

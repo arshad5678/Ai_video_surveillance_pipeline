@@ -15,7 +15,7 @@ from loguru import logger
 
 from ...models.domain.frame import Frame
 from .exceptions import VideoSourceConnectionError, VideoSourceError, VideoSourceNotFoundError
-from .types import VideoSourceConfig, VideoSourceType
+from .types import VideoSourceConfig, VideoSourceStatus, VideoSourceType
 
 
 class VideoInput:
@@ -141,6 +141,36 @@ class VideoInput:
                 logger.info("Read {} frames so far from {} source.", frame.index, self._config.source_type.value)
 
             yield frame
+
+    def probe_status(self) -> VideoSourceStatus:
+        """Best-effort connectivity check: opens the source, reads cv2 properties, closes again.
+
+        Never raises — a connection failure is reported via connected=False
+        rather than propagating VideoSourceError, since this is a status
+        check (e.g. for a REST API), not a streaming operation.
+        """
+        try:
+            self.open()
+            capture = self._capture
+            assert capture is not None  # guaranteed by a successful open()
+            fps = capture.get(cv2.CAP_PROP_FPS) or None
+            width = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH)) or None
+            height = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT)) or None
+            connected = True
+        except VideoSourceError:
+            fps = width = height = None
+            connected = False
+        finally:
+            self.close()
+
+        return VideoSourceStatus(
+            source_type=self._config.source_type,
+            uri=self._config.uri,
+            connected=connected,
+            fps=fps,
+            width=width,
+            height=height,
+        )
 
     def close(self) -> None:
         """Release the underlying capture device. Safe to call multiple times."""
