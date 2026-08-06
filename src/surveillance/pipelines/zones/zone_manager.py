@@ -8,7 +8,7 @@ point-in-polygon math lives here.
 """
 
 from pathlib import Path
-from typing import Dict, Iterable, Iterator, List, Union
+from typing import Dict, Iterable, Iterator, List, Tuple, Union
 
 from loguru import logger
 from shapely.geometry import Point, Polygon
@@ -43,6 +43,17 @@ class ZoneManager:
         self.reload()
 
         logger.info("ZoneManager initialized with {} zone(s).", len(self._zones))
+
+    @property
+    def zones(self) -> Tuple[Zone, ...]:
+        """Read-only snapshot of the currently loaded zones.
+
+        Added so downstream modules (e.g. IntrusionDetector, which needs
+        Zone objects to resolve zone_type/zone_name) can share this
+        ZoneManager's authoritative, reload()-aware zone list instead of
+        re-parsing zones.yaml themselves and risking drift after a reload.
+        """
+        return tuple(self._zones)
 
     def reload(self) -> None:
         """Reload zone definitions from disk without restarting the application."""

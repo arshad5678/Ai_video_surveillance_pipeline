@@ -53,6 +53,14 @@ tracking:
   history_length: 30         # max trajectory points retained per track
   verbose: false
 
+intrusion:
+  enabled: true
+  monitor_zone_types:
+    - intrusion               # only zones with this zone_type generate ENTER/EXIT events
+  emit_exit_events: true
+  verbose: false
+  stale_state_ttl_seconds: 300 # prune (track,zone) state unseen for this long (cleanup, not an EXIT)
+
 logging:
   level: "INFO"
   rotation: "10 MB"
