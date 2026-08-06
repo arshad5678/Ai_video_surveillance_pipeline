@@ -61,6 +61,14 @@ intrusion:
   verbose: false
   stale_state_ttl_seconds: 300 # prune (track,zone) state unseen for this long (cleanup, not an EXIT)
 
+loitering:
+  enabled: true
+  threshold_seconds: 10
+  monitor_zone_types:
+    - intrusion               # only zones with this zone_type generate loitering events
+  verbose: false
+  stale_state_ttl_seconds: 300 # prune (track,zone) dwell state unseen for this long (cleanup, not an event)
+
 logging:
   level: "INFO"
   rotation: "10 MB"
