@@ -7,12 +7,31 @@ app:
 
 pipeline:
   device: "cpu"              # cpu | cuda | mps — overridden by DEVICE env var
-  frame_sample_rate: 1        # placeholder: every Nth frame processed, used once frame sampling is implemented
 
 video_input:
   reconnect_attempts: 3       # webcam/RTSP: read failures tolerated before giving up
   reconnect_delay_seconds: 2.0
   read_timeout_seconds: 5.0   # RTSP open/read timeout (CAP_PROP_*_TIMEOUT_MSEC)
+
+frame_processing:
+  resize:
+    enabled: false
+    width: 640
+    height: 640
+
+  color_conversion:
+    enabled: false
+    mode: "RGB"                # RGB | GRAY — OpenCV frames are natively BGR, so this is a no-op unless enabled
+
+  normalize:
+    enabled: false
+    scale: 0.00392156862745098 # 1/255 — scales uint8 [0,255] to float32 [0,1]
+    mean: null                 # optional per-channel mean, e.g. [0.485, 0.456, 0.406]
+    std: null                  # optional per-channel std,  e.g. [0.229, 0.224, 0.225]
+
+  frame_skip:
+    enabled: false
+    interval: 1                 # process every Nth frame (1 = process all)
 
 logging:
   level: "INFO"
