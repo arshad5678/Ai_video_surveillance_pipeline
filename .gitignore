@@ -25,6 +25,10 @@ data/processed/*
 !data/output/.gitkeep
 !data/processed/.gitkeep
 
+# OutputGenerator artifacts (annotated video, snapshots, clips, logs)
+output/*
+!output/.gitkeep
+
 # Logs
 logs/*
 !logs/.gitkeep

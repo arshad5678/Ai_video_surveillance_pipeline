@@ -84,6 +84,20 @@ events:
     loitering: MEDIUM
   verbose: false
 
+output:
+  annotated_video: true
+  snapshots: true
+  clips: true
+  json_log: true
+  csv_log: true
+  clip_pre_seconds: 5
+  clip_post_seconds: 5
+  output_directory: "output"
+  video_codec: "mp4v"
+  jpeg_quality: 95
+  frame_rate: 30       # source video fps — sizes writer fps and the pre/post clip buffer (not in prompt's example, needed for both)
+  verbose: false
+
 logging:
   level: "INFO"
   rotation: "10 MB"
