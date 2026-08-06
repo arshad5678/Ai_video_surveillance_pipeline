@@ -33,6 +33,14 @@ frame_processing:
     enabled: false
     interval: 1                 # process every Nth frame (1 = process all)
 
+detection:
+  model_path: "weights/yolov8n.pt"  # nano model — smallest/fastest COCO-pretrained YOLO
+  confidence_threshold: 0.25
+  iou_threshold: 0.45
+  device: "cpu"                     # cpu | cuda | mps — falls back to pipeline.device if omitted
+  image_size: 640
+  verbose: false
+
 logging:
   level: "INFO"
   rotation: "10 MB"

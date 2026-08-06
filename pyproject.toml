@@ -16,6 +16,9 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+    "integration: exercises real components (e.g. YOLO inference) — slower, may need network access for model download",
+]
 
 [tool.ruff]
 line-length = 100
