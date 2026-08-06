@@ -1,0 +1,25 @@
+# Zone definitions for the Zone Manager module.
+# Polygon coordinates are [x, y] pixel points in the source video's frame
+# space, listed in order (they form a closed ring — do not repeat the
+# first point at the end).
+
+zones:
+  - id: restricted_area
+    name: Restricted Area
+    type: intrusion
+    enabled: true
+    polygon:
+      - [100, 120]
+      - [500, 120]
+      - [500, 600]
+      - [100, 600]
+
+  - id: loading_bay
+    name: Loading Bay
+    type: monitoring
+    enabled: true
+    polygon:
+      - [700, 100]
+      - [1100, 100]
+      - [1100, 700]
+      - [700, 700]
