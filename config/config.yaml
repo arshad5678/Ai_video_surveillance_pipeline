@@ -1,0 +1,20 @@
+# Non-secret application/pipeline configuration.
+# Secrets and environment-specific values (DB URL, ports, etc.) belong in .env instead.
+
+app:
+  name: "AI Video Surveillance Pipeline"
+  version: "0.1.0"
+
+pipeline:
+  device: "cpu"              # cpu | cuda | mps — overridden by DEVICE env var
+  frame_sample_rate: 1        # placeholder: every Nth frame processed, used once frame sampling is implemented
+
+video_input:
+  reconnect_attempts: 3       # webcam/RTSP: read failures tolerated before giving up
+  reconnect_delay_seconds: 2.0
+  read_timeout_seconds: 5.0   # RTSP open/read timeout (CAP_PROP_*_TIMEOUT_MSEC)
+
+logging:
+  level: "INFO"
+  rotation: "10 MB"
+  retention: "7 days"

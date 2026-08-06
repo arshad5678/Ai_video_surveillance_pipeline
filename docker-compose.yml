@@ -1,0 +1,6 @@
+# Placeholder compose file — populated once the Dockerfile and
+# API/CLI services are implemented.
+#
+# Planned shape: a single `pipeline` service built from the local
+# Dockerfile, mounting ./data, ./weights, ./config and ./logs as
+# volumes, with an optional `api` service exposing the FastAPI app.
