@@ -17,15 +17,18 @@ env/
 weights/*
 !weights/.gitkeep
 
-# Data (input/output video artifacts, not source-controlled)
+# Data (input video artifacts, not source-controlled)
 data/input/*
-data/output/*
 data/processed/*
 !data/input/.gitkeep
-!data/output/.gitkeep
 !data/processed/.gitkeep
 
-# OutputGenerator artifacts (annotated video, snapshots, clips, logs)
+# OutputGenerator artifacts (annotated video, snapshots, clips, logs) --
+# runtime-generated on every pipeline execution, never source-controlled.
+# sample_outputs/ is the deliberate exception: a small, hand-picked,
+# committed set of example artifacts for GitHub submission (see its
+# README section) -- nothing under output/ is ever copied there
+# automatically, and the pipeline/API never read from or write to it.
 output/*
 !output/.gitkeep
 
