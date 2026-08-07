@@ -149,6 +149,37 @@ def test_config_reload_failure_returns_400_and_leaves_state_untouched(
     assert len(container.zone_manager.zones) == 1  # unchanged
 
 
+def test_build_container_and_reload_do_not_wipe_existing_pipeline_output(tmp_path: Path) -> None:
+    """Regression test: OutputGenerator defaults to wiping output/ on construction
+    (clean_previous_outputs=True, added so a real pipeline run starts fresh), but
+    this API's OutputGenerator is read-only and gets rebuilt on every startup and
+    every /config/reload -- pointed at the *same* directory a real pipeline run
+    already populated. build_container()/reload_config() must build it with
+    clean_previous_outputs=False, or restarting/reloading the API would silently
+    delete real snapshots/clips/logs a pipeline run already produced.
+    """
+    from src.surveillance.api.dependencies.container import build_container, reload_config
+
+    output_dir = tmp_path / "output"
+    snapshots_dir = output_dir / "snapshots"
+    snapshots_dir.mkdir(parents=True)
+    real_snapshot = snapshots_dir / "event_001.jpg"
+    real_snapshot.write_bytes(b"real pipeline snapshot bytes")
+
+    # build_container() always reads zones from DEFAULT_ZONES_CONFIG_PATH (config/zones.yaml,
+    # the real repo file) -- only output_directory needs to be redirected to tmp_path here.
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(f'output:\n  output_directory: "{output_dir.as_posix()}"\n')
+
+    settings = get_settings().model_copy(update={"config_path": str(config_path)})
+
+    built_container = build_container(settings)
+    assert real_snapshot.exists(), "build_container() must not wipe pre-existing output artifacts"
+
+    reload_config(built_container)
+    assert real_snapshot.exists(), "reload_config() must not wipe pre-existing output artifacts"
+
+
 # --- camera ---------------------------------------------------------------
 
 

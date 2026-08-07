@@ -1,6 +1,7 @@
 """Unit tests for OutputGenerator — real (tiny, tmp_path-scoped) file I/O throughout,
 except where a failure path needs cv2 itself to be forced into erroring."""
 
+import shutil
 from pathlib import Path
 from types import MappingProxyType
 from unittest.mock import MagicMock, patch
@@ -268,10 +269,14 @@ def test_no_logs_when_disabled(tmp_path: Path) -> None:
 def test_latest_snapshot_falls_back_to_disk_for_a_fresh_instance(tmp_path: Path) -> None:
     # Simulates a separate reader process (e.g. the Prompt 12 API) that never
     # called write_frame() itself, but the snapshot files already exist on disk.
+    # Must opt out of the default start-of-run cleanup -- a read-only reader
+    # is not "starting a new pipeline execution" and must not wipe what the
+    # writer just produced (this is exactly what api/dependencies/container.py
+    # does in production via clean_previous_outputs=False).
     writer = OutputGenerator(make_config(tmp_path / "out"))
     writer.write_frame(make_processed_frame(), [make_track()], [make_zone()], [make_event(event_id="evt-1")])
 
-    reader = OutputGenerator(make_config(tmp_path / "out"))
+    reader = OutputGenerator(make_config(tmp_path / "out", clean_previous_outputs=False))
 
     assert reader.latest_snapshot() == writer.latest_snapshot() == tmp_path / "out" / "snapshots" / "event_001.jpg"
 
@@ -289,3 +294,101 @@ def test_context_manager_releases_resources(tmp_path: Path) -> None:
         generator.write_frame(make_processed_frame(), [make_track()], [make_zone()], [])
 
     assert generator.latest_video().exists()
+
+
+# --- clean_previous_outputs: fresh-run behavior ---------------------------
+
+
+def test_clean_previous_outputs_removes_stale_snapshots(tmp_path: Path) -> None:
+    output_dir = tmp_path / "out"
+    snapshots_dir = output_dir / "snapshots"
+    snapshots_dir.mkdir(parents=True)
+    stale_snapshot = snapshots_dir / "event_001.jpg"
+    stale_snapshot.write_bytes(b"stale jpeg bytes")
+
+    OutputGenerator(make_config(output_dir))
+
+    assert not stale_snapshot.exists()
+    assert snapshots_dir.is_dir()  # the directory itself is kept, only its contents are removed
+
+
+def test_clean_previous_outputs_removes_stale_clips(tmp_path: Path) -> None:
+    output_dir = tmp_path / "out"
+    clips_dir = output_dir / "clips"
+    clips_dir.mkdir(parents=True)
+    stale_clip = clips_dir / "event_001.mp4"
+    stale_clip.write_bytes(b"stale mp4 bytes")
+
+    OutputGenerator(make_config(output_dir))
+
+    assert not stale_clip.exists()
+    assert clips_dir.is_dir()
+
+
+def test_clean_previous_outputs_removes_stale_logs_and_video(tmp_path: Path) -> None:
+    output_dir = tmp_path / "out"
+    logs_dir = output_dir / "logs"
+    video_dir = output_dir / "annotated_video"
+    logs_dir.mkdir(parents=True)
+    video_dir.mkdir(parents=True)
+    stale_json = logs_dir / "events.json"
+    stale_csv = logs_dir / "events.csv"
+    stale_video = video_dir / "output.mp4"
+    stale_json.write_text('[{"event_id": "evt-old"}]')
+    stale_csv.write_text("event_id,event_type,severity,track_id,zone_id,timestamp,frame_index\nevt-old,x,LOW,1,z,1.0,0\n")
+    stale_video.write_bytes(b"stale video bytes")
+
+    OutputGenerator(make_config(output_dir))
+
+    assert not stale_json.exists()
+    assert not stale_csv.exists()
+    assert not stale_video.exists()
+    assert logs_dir.is_dir() and video_dir.is_dir()
+
+
+def test_clean_previous_outputs_disabled_preserves_existing_files(tmp_path: Path) -> None:
+    output_dir = tmp_path / "out"
+    snapshots_dir = output_dir / "snapshots"
+    snapshots_dir.mkdir(parents=True)
+    kept_snapshot = snapshots_dir / "event_001.jpg"
+    kept_snapshot.write_bytes(b"kept jpeg bytes")
+
+    OutputGenerator(make_config(output_dir, clean_previous_outputs=False))
+
+    assert kept_snapshot.exists()
+
+
+def test_output_directories_recreated_automatically_if_missing(tmp_path: Path) -> None:
+    output_dir = tmp_path / "out"
+    OutputGenerator(make_config(output_dir)).release()
+
+    shutil.rmtree(output_dir / "snapshots")
+    shutil.rmtree(output_dir / "clips")
+    assert not (output_dir / "snapshots").exists()
+    assert not (output_dir / "clips").exists()
+
+    OutputGenerator(make_config(output_dir))
+
+    assert (output_dir / "snapshots").is_dir()
+    assert (output_dir / "clips").is_dir()
+    assert (output_dir / "logs").is_dir()
+    assert (output_dir / "annotated_video").is_dir()
+
+
+def test_csv_starts_fresh_every_execution(tmp_path: Path) -> None:
+    output_dir = tmp_path / "out"
+
+    first_run = OutputGenerator(make_config(output_dir))
+    first_run.write_frame(make_processed_frame(), [make_track()], [make_zone()], [make_event(event_id="evt-run1")])
+    csv_path = first_run.latest_event_log().csv_path
+    first_run_content = csv_path.read_text()
+    assert "evt-run1" in first_run_content
+
+    second_run = OutputGenerator(make_config(output_dir))  # default clean_previous_outputs=True: fresh execution
+    second_run.write_frame(make_processed_frame(), [make_track()], [make_zone()], [make_event(event_id="evt-run2")])
+
+    second_run_content = csv_path.read_text()
+    lines = second_run_content.strip().splitlines()
+    assert "evt-run1" not in second_run_content
+    assert "evt-run2" in second_run_content
+    assert lines.count("event_id,event_type,severity,track_id,zone_id,timestamp,frame_index") == 1

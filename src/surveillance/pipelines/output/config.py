@@ -30,4 +30,5 @@ def build_output_config(
         jpeg_quality=int(section.get("jpeg_quality", 95)),
         frame_rate=float(section.get("frame_rate", 30.0)),
         verbose=bool(section.get("verbose", False)),
+        clean_previous_outputs=bool(section.get("clean_previous_outputs", True)),
     )

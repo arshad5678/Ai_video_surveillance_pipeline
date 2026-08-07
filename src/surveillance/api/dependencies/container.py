@@ -11,17 +11,28 @@ VideoSourceConfig is kept for the Camera router's on-demand probe.
 Held on `app.state.container` (set once in app.py's lifespan handler) and
 reached via `dependencies/providers.py` — never a module-level global, so
 each `create_app()` call gets its own independent, testable instance.
+
+Important: OutputGenerator defaults to wiping snapshots/clips/logs from a
+previous run on construction (`clean_previous_outputs=True`), since a
+*pipeline* run constructing one really is starting fresh. This API is not
+a pipeline run — its OutputGenerator is read-only and gets rebuilt on
+every startup and every /config/reload while pointed at the same
+directory a real pipeline run already populated, so both places below
+explicitly build it with `clean_previous_outputs=False` via
+`_read_only_output_config()`. Forgetting this would mean restarting the
+API, or simply reloading its config, silently deletes real pipeline
+output.
 """
 
 import time
-from dataclasses import dataclass
-from typing import Optional
+from dataclasses import dataclass, replace
+from typing import Any, Dict, Optional
 
 from ...core.config_loader import load_yaml_config
 from ...core.constants import DEFAULT_ZONES_CONFIG_PATH
 from ...core.settings import Settings, get_settings
 from ...pipelines.events import EventEngine, build_event_engine_config
-from ...pipelines.output import OutputGenerator, build_output_config
+from ...pipelines.output import OutputConfig, OutputGenerator, build_output_config
 from ...pipelines.video_input import VideoSourceConfig, build_video_source_config
 from ...pipelines.zones import ZoneManager
 from ..exceptions.api_exceptions import ConfigurationReloadError
@@ -40,6 +51,17 @@ class ServiceContainer:
     started_at: float
 
 
+def _read_only_output_config(settings: Settings, yaml_config: Dict[str, Any]) -> OutputConfig:
+    """Same OutputConfig a pipeline run would get, except never wipes existing output/ files.
+
+    This API's OutputGenerator only ever reads paths back (latest_video/
+    latest_snapshot/latest_event_log) — it never calls write_frame() — so
+    it must never run the "start of a new pipeline execution" cleanup a
+    real run wants by default.
+    """
+    return replace(build_output_config(settings, yaml_config), clean_previous_outputs=False)
+
+
 def build_container(settings: Optional[Settings] = None) -> ServiceContainer:
     settings = settings or get_settings()
     config_path = settings.config_path
@@ -54,7 +76,7 @@ def build_container(settings: Optional[Settings] = None) -> ServiceContainer:
         yaml_config=yaml_config,
         zone_manager=ZoneManager(zones_path),
         event_engine=EventEngine(build_event_engine_config(settings, yaml_config)),
-        output_generator=OutputGenerator(build_output_config(settings, yaml_config)),
+        output_generator=OutputGenerator(_read_only_output_config(settings, yaml_config)),
         video_source_config=build_video_source_config(settings, yaml_config),
         started_at=time.monotonic(),
     )
@@ -72,7 +94,7 @@ def reload_config(container: ServiceContainer) -> None:
     try:
         new_yaml_config = load_yaml_config(container.config_path)
         new_event_engine = EventEngine(build_event_engine_config(container.settings, new_yaml_config))
-        new_output_generator = OutputGenerator(build_output_config(container.settings, new_yaml_config))
+        new_output_generator = OutputGenerator(_read_only_output_config(container.settings, new_yaml_config))
         container.zone_manager.reload()
     except Exception as exc:
         raise ConfigurationReloadError(f"Failed to reload configuration: {exc}") from exc

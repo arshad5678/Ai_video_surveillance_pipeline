@@ -50,6 +50,12 @@ class OutputGenerator:
             directory.mkdir(parents=True, exist_ok=True)
 
         self._video_path = self._annotated_video_dir / "output.mp4"
+        self._json_path = self._logs_dir / "events.json"
+        self._csv_path = self._logs_dir / "events.csv"
+
+        if config.clean_previous_outputs:
+            self._clean_previous_outputs()
+
         self._video_writer: Optional[_VideoWriterHandle] = (
             _VideoWriterHandle(self._video_path, config.video_codec, config.frame_rate)
             if config.annotated_video
@@ -60,8 +66,8 @@ class OutputGenerator:
         post_frame_count = max(round(config.frame_rate * config.clip_post_seconds), 0)
         self._clip_recorder = _ClipRecorder(pre_frame_count, post_frame_count)
 
-        json_path = self._logs_dir / "events.json" if config.json_log else None
-        csv_path = self._logs_dir / "events.csv" if config.csv_log else None
+        json_path = self._json_path if config.json_log else None
+        csv_path = self._csv_path if config.csv_log else None
         self._log_writer = _EventLogWriter(json_path, csv_path)
         self._log_paths = EventLogPaths(json_path=json_path, csv_path=csv_path)
 
@@ -70,7 +76,7 @@ class OutputGenerator:
 
         logger.info(
             "OutputGenerator initialized: output_directory={}, annotated_video={}, snapshots={}, clips={}, "
-            "json_log={}, csv_log={}, clip_pre_seconds={}, clip_post_seconds={}",
+            "json_log={}, csv_log={}, clip_pre_seconds={}, clip_post_seconds={}, clean_previous_outputs={}",
             self._output_root,
             config.annotated_video,
             config.snapshots,
@@ -79,7 +85,39 @@ class OutputGenerator:
             config.csv_log,
             config.clip_pre_seconds,
             config.clip_post_seconds,
+            config.clean_previous_outputs,
         )
+
+    def _clean_previous_outputs(self) -> None:
+        """Delete artifacts from a previous run, keeping the directory structure itself.
+
+        Runs once at construction time, before any writer is opened, so a
+        fresh pipeline execution never mixes this run's events with a
+        previous run's leftover snapshots/clips/logs (e.g. 7 events in
+        events.json but 10 snapshots/clips from an earlier execution).
+        Only files are removed — output/snapshots/, output/clips/, and
+        output/logs/ themselves are left in place.
+        """
+        removed = 0
+        try:
+            for directory in (self._snapshots_dir, self._clips_dir):
+                for path in directory.iterdir():
+                    if path.is_file():
+                        path.unlink()
+                        removed += 1
+
+            for path in (self._video_path, self._json_path, self._csv_path):
+                if path.exists():
+                    path.unlink()
+                    removed += 1
+        except OSError as exc:
+            logger.error("Failed to clean previous output artifacts: {}", exc)
+            raise OutputGenerationError(f"Failed to clean previous output artifacts: {exc}") from exc
+
+        if removed:
+            logger.info("Cleaned {} artifact(s) from a previous run in {}.", removed, self._output_root)
+        else:
+            logger.debug("No previous output artifacts to clean in {}.", self._output_root)
 
     def write_frame(
         self,

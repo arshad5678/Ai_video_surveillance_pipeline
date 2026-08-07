@@ -3,8 +3,14 @@
 JSON has no natural append mode, so the writer keeps the full record
 list in memory (one small dict per event — negligible compared to
 frame data) and rewrites the file each time an event occurs, not each
-frame; CSV is append-friendly and gets one row written directly, with
-the header written once on first use.
+frame; CSV is append-friendly and gets one row written directly.
+
+Each `_EventLogWriter` instance represents exactly one run: its first
+CSV write always opens in "w" mode (truncating any stale file left over
+from a previous run) and writes the header, then every subsequent write
+within that same instance's lifetime appends — so the CSV never mixes
+this run's rows with an earlier run's, regardless of what OutputGenerator
+-level cleanup did or didn't already do to the file.
 """
 
 import csv
@@ -55,12 +61,16 @@ class _EventLogWriter:
         logger.debug("JSON updated: {} ({} records)", self._json_path, len(self._records))
 
     def _write_csv(self, record: Dict[str, Any]) -> None:
+        # "w" (truncate) on this instance's first write -- guarantees a fresh
+        # file for this run regardless of what a previous run left behind;
+        # "a" (append) afterwards, so later events in *this* run accumulate.
+        is_first_write = not self._csv_header_written
+        mode = "w" if is_first_write else "a"
         try:
             self._csv_path.parent.mkdir(parents=True, exist_ok=True)
-            write_header = not self._csv_header_written and not self._csv_path.exists()
-            with open(self._csv_path, "a", newline="", encoding="utf-8") as handle:
+            with open(self._csv_path, mode, newline="", encoding="utf-8") as handle:
                 writer = csv.DictWriter(handle, fieldnames=_CSV_FIELDS)
-                if write_header:
+                if is_first_write:
                     writer.writeheader()
                 writer.writerow({field: record[field] for field in _CSV_FIELDS})
             self._csv_header_written = True
